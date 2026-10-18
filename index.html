@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1120">
+  <meta name="description" content="질문을 품고, 카드를 펼치고, 나의 마음을 읽는 시간. 별결에서 만나는 일상의 타로.">
+  <title>별결 타로 — 마음을 비추는 카드</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">본문으로 건너뛰기</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#reading" class="brand" data-nav="home" aria-label="별결 타로 처음으로"><span class="brand-star" aria-hidden="true">✧</span><span>별결<span class="brand-en">BYEOLGYEOL TAROT</span></span></a>
+      <nav class="main-nav" aria-label="주 메뉴">
+        <a href="#reading" data-nav="home">타로 리딩</a><a href="#birth" data-nav="birth">탄생 카드</a><a href="#library" data-nav="library">카드 도감</a><a href="#history" data-nav="history">나의 기록<span id="history-count" class="nav-count"></span></a>
+      </nav>
+      <button class="icon-button settings-button" data-action="settings" aria-label="설정"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16M4 17h16M8 4v6m8 4v6"/></svg></button>
+    </div>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <footer class="site-footer"><div><a href="#reading" class="footer-brand" data-nav="home">✧ 별결</a><span>카드는 답을 정하지 않아요. 당신의 생각에 빛을 비춥니다.</span></div><div class="footer-links"><button data-action="guide">처음 오셨나요?</button><button data-action="credits">자료와 이미지 출처</button><span>MADE FOR A QUIET MOMENT</span></div></footer>
+  <dialog id="modal" class="modal" aria-labelledby="modal-title"><div id="modal-content"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <noscript><p class="noscript">별결 타로를 사용하려면 브라우저의 자바스크립트를 켜 주세요.</p></noscript>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

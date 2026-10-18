@@ -1,0 +1,10 @@
+{
+  "name": "byeolgyeol-tarot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "모바일·PC용 별결 타로 정적 웹사이트",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/engine.test.mjs"
+  }
+}
