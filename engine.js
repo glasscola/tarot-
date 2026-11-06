@@ -280,7 +280,7 @@ export function formatReading(reading, { hideQuestion = false } = {}) {
     ? new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
     : String(reading.date ?? '');
   const lines = [
-    '별결 타로 · 타로 리딩',
+    '월솜 타로 · 타로 리딩',
     `${readableDate} · ${reading.spreadName} · ${reading.topicName}`,
     ...(hideQuestion ? [] : ['', `질문: ${reading.question}`]),
     '', '전체 흐름', reading.summary,

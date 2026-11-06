@@ -116,7 +116,7 @@ assert.equal(typeof reading.reflection, 'string');
 assert.ok(reading.id.length > 10);
 
 const text = formatReading(reading);
-assert.ok(text.startsWith('별결 타로 · 타로 리딩\n'));
+assert.ok(text.startsWith('월솜 타로 · 타로 리딩\n'));
 assert.ok(text.includes(rawQuestion), 'Clipboard output preserves user text literally.');
 assert.match(text, /1\. 과거 —/);
 assert.match(text, /2\. 현재 —/);
