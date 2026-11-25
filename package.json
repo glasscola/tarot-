@@ -1,6 +1,6 @@
 {
   "name": "wolsom-tarot",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "모바일·PC용 월솜 타로 정적 웹사이트",
   "type": "module",

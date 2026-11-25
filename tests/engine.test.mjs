@@ -105,7 +105,7 @@ assert.deepEqual(reading.entries.map(entry => entry.positionName), ['과거', '�
 assert.equal(reading.entries[1].cardMeaning, CARDS.find(card => card.id === 'm01').reversed);
 assert.match(reading.entries[2].interpretation, /현재의 선택과 주변 조건에 따라 흐름은 달라질 수/);
 assert.match(reading.entries[0].interpretation, /과거의 경험 중 ‘새 출발’과 닮은 장면/);
-assert.match(reading.entries[1].interpretation, /현재는 ‘실행’이 잘 드러나지 않거나/);
+assert.match(reading.entries[1].interpretation, /현재 상황에서 ‘실행’에 관해/);
 assert.ok(!reading.entries[1].interpretation.includes('실제로 확인할 수 있는 정보'), 'Topic guidance appears in the summary rather than every entry.');
 assert.match(reading.summary, /실제로 확인할 수 있는 정보/);
 assert.match(reading.summary, /역방향 1장/);
@@ -114,6 +114,12 @@ assert.ok(!reading.summary.includes('새 출발 (역방향)'), 'Summary reversal
 assert.equal(typeof reading.focus, 'string');
 assert.equal(typeof reading.reflection, 'string');
 assert.ok(reading.id.length > 10);
+
+const burden = makeReading({
+  question: '어떤 습관을 바꿔 볼까요?', spreadId: 'timeline',
+  selected: [{id:'wands10',reversed:true}, ...selected.slice(1)]
+});
+assert.match(burden.entries[0].interpretation, /예전에 혼자 떠안았던 책임이 지금의 선택에도 영향을/);
 
 const text = formatReading(reading);
 assert.ok(text.startsWith('월솜 타로 · 타로 리딩\n'));
@@ -130,7 +136,7 @@ assert.deepEqual(changedQuestion.entries, reading.entries, 'No facts or interpre
 assert.equal(changedQuestion.summary, reading.summary);
 const action = makeReading({ question: '무엇을 할까?', spreadId: 'action', selected });
 assert.notEqual(action.entries[1].interpretation, reading.entries[1].interpretation, 'Different positions meaningfully change interpretation.');
-assert.match(action.entries[1].interpretation, /행동에 앞서 ‘실행’/);
+assert.match(action.entries[1].interpretation, /‘실행’에 관해 미루고 있던 일/);
 const choice = makeReading({ question: 'A와 B를 비교하자', spreadId: 'choice', selected: CARDS.slice(0, 5).map(card => ({ id: card.id, reversed: false })) });
 assert.match(choice.entries[2].interpretation, /A에서는 ‘관찰’/);
 assert.match(choice.entries[3].interpretation, /B를 선택할 때 ‘돌봄’/);
@@ -138,7 +144,7 @@ assert.match(choice.summary, /실제 조건과 내 우선순위/);
 const relationship = makeReading({ question: '친구와 어떻게 이야기할까?', spreadId: 'relationship', topic: 'love', selected });
 assert.deepEqual(relationship.entries.map(entry => entry.positionName), ['나의 태도', '상대에게 확인할 점', '관계의 접점']);
 assert.match(relationship.entries[0].interpretation, /내 반응/);
-assert.match(relationship.entries[1].interpretation, /상대에게 그대로 적용하지 마세요/);
+assert.match(relationship.entries[1].interpretation, /상대에게 직접 들은 말과 내가 짐작한 부분/);
 assert.match(relationship.entries[2].interpretation, /서로.*동의/);
 assert.match(relationship.summary, /상대의 마음이나 관계의 결말을 확정하지 않습니다/);
 assert.match(relationship.focus, /상대에게 직접 물을 부분/);
@@ -166,12 +172,16 @@ for (const topic of TOPICS) {
     assert.equal(copy.split(topicContexts[topic.id]).length - 1, 1, 'Shared topic guidance occurs exactly once in the complete result.');
     assert.equal(copy.split('힘의 막힘·과도함·내면화를 점검하는 관점').length - 1, 1, 'The collective reversal guidance occurs once.');
     assert.ok(!copy.includes('속도와 강도를 먼저 조절해 보세요.'), 'A generic reversal instruction does not repeat before unique card advice.');
-    result.entries.forEach(entry => {
+    const upright = makeReading({
+      question: result.question, topic: topic.id, spreadId: spread.id,
+      selected: CARDS.slice(0, spread.count).map(card => ({id:card.id,reversed:false})),
+    });
+    result.entries.forEach((entry,index) => {
       const definition = CARDS.find(card => card.id === entry.id);
       assert.equal(entry.cardMeaning, definition.reversed, 'Unique reversed meanings remain intact.');
       assert.equal(entry.advice, definition.advice, 'Unique advice remains intact.');
       assert.ok(entry.interpretation.includes(`‘${entry.keywords[0]}’`), 'Interpretation joins the actual card theme to its spread role.');
-      assert.match(entry.interpretation, /막|과도|지나치|억누르|안에서/, 'Reversed interpretations explore obstruction, excess or inward expression.');
+      assert.notEqual(entry.interpretation, upright.entries[index].interpretation, 'Direction changes the place-specific reading.');
       assert.ok(!entry.interpretation.includes('자리는'), 'Interpretation reads the card rather than explaining the layout.');
     });
     assert.equal(result.summary.match(/\(역방향\)/g)?.length, spread.count, 'Every reversed keyword is individually marked in the summary.');

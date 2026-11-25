@@ -157,7 +157,13 @@ export function shuffleDeck(cards, allowReversed = false) {
   return deck;
 }
 
-function roleInterpretation(role, keyword, reversed) {
+function roleInterpretation(role, card, reversed) {
+  if(card.id === 'wands10' && role === 'past' && reversed) {
+    return '예전에 혼자 떠안았던 책임이 지금의 선택에도 영향을 주고 있는지 돌아보세요. 그때 꼭 맡아야 했던 일과 지금은 나눌 수 있는 일을 구분해 보세요.';
+  }
+  const keyword = card.keywords[0];
+  const theme = `‘${keyword}’에 관해`;
+
   const lastCode = keyword.trim().at(-1).charCodeAt(0);
   const hasFinalConsonant = lastCode >= 0xAC00 && lastCode <= 0xD7A3 && (lastCode - 0xAC00) % 28 !== 0;
   const subject = `‘${keyword}’${hasFinalConsonant ? '이' : '가'}`;
@@ -183,23 +189,23 @@ function roleInterpretation(role, keyword, reversed) {
     connection: `${companion} 관련해 서로 함께 시도해 볼 수 있는 작은 약속을 찾아보세요. 같은 생각이라고 가정하기보다 각자의 필요를 말하고 동의할 수 있는 범위를 조율해 보면 좋겠습니다.`,
   };
   const reversedRoles = {
-    core: `지금은 ${subject} 잘 드러나지 않거나 지나치게 힘을 쓰는 부분을 먼저 살펴보세요. 바깥의 답을 서둘러 찾기보다 내 안의 반응을 알아차리는 일이 실마리가 될 수 있습니다.`,
-    past: `지난 경험에서 ${subject} 막혔거나 지나쳤던 부분이 있다면, 그때의 반응이 지금도 이어지는지 돌아보세요. 오래된 방식을 그대로 반복해야 하는지 차분히 점검해 보면 좋겠습니다.`,
-    present: `현재는 ${subject} 잘 드러나지 않거나 필요 이상으로 강해진 부분이 있는지 살펴볼 때입니다. 겉으로 보이는 모습과 내 안에서 느끼는 마음의 차이를 먼저 짚어보세요.`,
-    future: `앞으로는 ‘${keyword}’의 막힘이나 과도함을 조정할 가능성을 살펴보세요. 현재의 반응을 바꾸면 흐름도 달라질 수 있으니, 같은 패턴이 나타날 때 멈추어 확인할 기준을 준비해 보면 좋겠습니다.`,
-    action: `행동에 앞서 ${object} 억누르거나 과하게 밀어붙이고 있는지 확인해 보세요. 큰 시도보다 막힌 지점 하나를 풀거나 강도를 낮추는 작은 행동에서 시작해 보면 좋겠습니다.`,
-    outcome: `행동 뒤에는 ${subject} 막히거나 과도하게 드러나는 순간이 있는지 관찰해 보세요. 기대한 변화가 보이지 않더라도 결과를 서둘러 확정하지 말고 속도와 방법을 조정해 볼 여지가 있습니다.`,
-    background: `‘${keyword}’에 관해 드러내지 못한 마음이나 지나치게 붙잡은 기대가 고민의 배경에 있는지 살펴보세요. 내 안에서 반복되는 생각을 적어보면 현재의 반응을 이해하는 데 도움이 될 수 있습니다.`,
-    obstacle: `${subject} 충분히 드러나지 않거나 지나치게 반복되는 부분이 걸림돌이 되는지 살펴보세요. 더 밀어붙이기 전에 무엇이 막혀 있고 어디에 힘을 덜 써도 되는지 나누어 보면 좋겠습니다.`,
-    support: `${object} 밖으로 펼치기 어렵다면 내 안에서 이미 쓰고 있는 작은 힘부터 찾아보세요. 부담이 적은 방식으로 연습하거나 지지를 구하면 막힌 자원을 다시 활용할 단서를 얻을 수 있습니다.`,
-    advice: `지금의 조언은 ${object} 더 강하게 밀기보다 막힘과 과도함 사이의 균형을 살펴보는 쪽에 있습니다. 앞선 카드들에서 부담이 겹치는 부분을 골라 작은 조정부터 시도해 보세요.`,
-    choiceA: `A에서 ‘${keyword}’의 가능성을 살리려면 무엇이 막혀 있거나 과도한지 먼저 확인해 보세요. 필요한 준비와 내 마음의 저항을 나누어 살피면 실제로 열려 있는 여지를 비교하기 좋습니다.`,
-    cautionA: `A에서는 ${object} 억누르거나 과하게 기대하는 부분이 부담을 키울 수 있는지 살펴보세요. 숨겨진 감정과 아직 확인하지 못한 조건을 구분한 뒤 선택의 기준을 다듬어 보면 좋겠습니다.`,
-    choiceB: `B에서 ‘${keyword}’의 가능성을 살리려면 무엇이 막혀 있거나 과도한지 먼저 확인해 보세요. 필요한 준비와 내 마음의 저항을 나누어 살피면 실제로 열려 있는 여지를 비교하기 좋습니다.`,
-    cautionB: `B에서는 ${object} 억누르거나 과하게 기대하는 부분이 부담을 키울 수 있는지 살펴보세요. 숨겨진 감정과 아직 확인하지 못한 조건을 구분한 뒤 선택의 기준을 다듬어 보면 좋겠습니다.`,
-    selfAttitude: `이 관계에서 ${object} 억누르거나 지나치게 드러내는 내 반응이 있는지 살펴보세요. 감정의 이름을 붙이고, 부담이 적은 표현부터 연습해 보면 좋겠습니다.`,
-    otherCheck: `${subject} 막히거나 과도하다는 해석을 상대에게 그대로 적용하지 마세요. 내가 짐작한 부분과 실제로 들은 말을 구분하고, 아직 확인하지 못한 필요를 차분히 물어보세요.`,
-    connection: `${subject} 관계 안에서 막히거나 과도하게 느껴진다면, 함께 감당할 수 있는 대화의 속도와 경계부터 맞추어 보세요. 서로 동의한 작은 조정을 시도하고 실제 반응을 살펴보면 좋겠습니다.`,
+    core: `지금 고민에서 ${theme} 내가 피하고 있거나 너무 애쓰고 있는 일이 있는지 살펴보세요. 가장 자주 반복되는 반응부터 떠올려 보세요.`,
+    past: `지난 경험에서 ${theme} 표현하지 못했던 마음이나 무리했던 선택이 있었는지 돌아보세요. 그때의 대응이 지금도 필요한지 살펴보세요.`,
+    present: `현재 상황에서 ${theme} 겉으로 보이는 모습과 속으로 느끼는 마음을 구분해 보세요. 감추고 있던 필요를 알아차리면 무엇부터 챙길지 정하기 쉬워져요.`,
+    future: `앞으로 ${theme} 같은 고민이 반복될 때 스스로 확인할 기준을 하나 정해 보세요. 무엇이 달라지면 지금과 다른 선택을 할 수 있을까요?`,
+    action: `${theme} 미루고 있던 일이나 무리해서 하고 있는 일이 있다면, 지금 감당할 수 있는 크기로 조정해 보세요.`,
+    outcome: `행동한 뒤 ${theme} 부담이 줄었는지, 예상과 다른 어려움이 생겼는지 관찰해 보세요. 실제 변화에 맞춰 다음 행동을 정하면 좋겠어요.`,
+    background: `지금 고민 뒤에 ${theme} 꺼내지 못한 생각이나 오래 품어 온 기대가 있는지 살펴보세요.`,
+    obstacle: `${theme} 피하고 있는 결정이나 한 가지 방식만 고집하고 있는 부분이 있는지 살펴보세요. 어디서부터 조정할 수 있을까요?`,
+    support: `${theme} 혼자 해결하기 어려운 부분이 있다면, 그중 하나를 도와줄 사람이나 이미 쓸 수 있는 자원을 찾아보세요.`,
+    advice: `${theme} 계속 힘을 쏟아야 할 일과 잠시 내려놓아도 될 일을 나눠 보세요. 앞선 카드에서 반복된 고민을 기준으로 작은 조정부터 해보세요.`,
+    choiceA: `A를 고른다면 ${theme} 원하는 것을 실현하는 데 어떤 준비가 필요한지 살펴보세요. 지금 갖춘 조건과 채워야 할 조건을 나눠 보세요.`,
+    cautionA: `A에서는 ${theme} 과하게 기대하거나 애써 무시하는 부분이 있는지 살펴보세요. 이 선택을 감당하려면 무엇이 더 필요한가요?`,
+    choiceB: `B를 고른다면 ${theme} 원하는 것을 실현하는 데 어떤 준비가 필요한지 살펴보세요. 지금 갖춘 조건과 채워야 할 조건을 나눠 보세요.`,
+    cautionB: `B에서는 ${theme} 과하게 기대하거나 애써 무시하는 부분이 있는지 살펴보세요. 이 선택을 감당하려면 무엇이 더 필요한가요?`,
+    selfAttitude: `이 관계에서 ${theme} 말하지 못했거나 너무 강하게 표현한 부분이 있는지 돌아보세요. 내가 실제로 원하는 것을 한 문장으로 적어보세요.`,
+    otherCheck: `${theme} 상대에게 직접 들은 말과 내가 짐작한 부분을 나눠 보세요. 아직 확인하지 못한 것은 편하게 답할 수 있는 질문으로 바꿔보세요.`,
+    connection: `${theme} 서로 속도를 다르게 느끼고 있다면, 둘 다 편하게 이야기할 수 있는 시간이나 범위부터 정해 보세요.`,
   };
   return (reversed ? reversedRoles : uprightRoles)[role];
 }
@@ -256,7 +262,7 @@ export function makeReading({ question, topic = 'general', spreadId = 'timeline'
       id: card.id, name: card.name, english: card.english, reversed,
       positionName: slot.name, positionMeaning: slot.meaning, keywords,
       cardMeaning: reversed ? card.reversed : card.upright,
-      interpretation: roleInterpretation(slot.role, keywords[0], reversed),
+      interpretation: roleInterpretation(slot.role, card, reversed),
       advice: card.advice,
     };
   });

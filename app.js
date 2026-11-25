@@ -1,5 +1,5 @@
 import { CARDS } from './cards.js';
-import { SPREADS, TOPICS, shuffleDeck, validateQuestion, makeReading, formatReading, birthCards } from './engine.js';
+import { SPREADS, TOPICS, shuffleDeck, validateQuestion, makeReading, formatReading, birthCards } from './engine.js?v=1.1.0';
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -11,17 +11,42 @@ const dialog = $('#modal');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const KEYS = { settings: 'byeolgyeol.settings.v1', history: 'byeolgyeol.readings.v1' };
 let storageAvailable = true;
-function readStorage(key, fallback) { try { const raw=localStorage.getItem(key);if(!raw)return fallback;try{return JSON.parse(raw);}catch{return fallback;} } catch { storageAvailable = false; return fallback; } }
+function readStorage(key, fallback) { try { const raw=localStorage.getItem(key);storageAvailable=true;if(!raw)return fallback;try{return JSON.parse(raw);}catch{return fallback;} } catch { storageAvailable = false; return fallback; } }
 function writeStorage(key, value) { try { localStorage.setItem(key, JSON.stringify(value));storageAvailable=true; return true; } catch { storageAvailable = false; return false; } }
 const rawSettings = readStorage(KEYS.settings, {});
 const settings = {deck: rawSettings?.deck === 'major' ? 'major' : 'full', reversed: rawSettings?.reversed === true, motion: ['normal','quick','off'].includes(rawSettings?.motion) ? rawSettings.motion : 'normal'};
 function validReading(r) { if(!r || typeof r!=='object' || !Array.isArray(r.entries) || r.entries.some(c=>!c||typeof c!=='object'))return false; return typeof r.id === 'string' && typeof r.question === 'string' && r.question.length <= 2000 && typeof r.date === 'string' && !Number.isNaN(Date.parse(r.date)) && typeof r.summary === 'string' && typeof r.focus === 'string' && typeof r.reflection === 'string' && SPREADS.some(s => s.id === r.spreadId) && r.entries.length === SPREADS.find(s => s.id === r.spreadId).count && new Set(r.entries.map(c => c.id)).size === r.entries.length && r.entries.every(c => CARD_MAP.has(c.id) && typeof c.reversed === 'boolean' && ['name','english','positionName','positionMeaning','cardMeaning','interpretation','advice'].every(k => typeof c[k] === 'string') && Array.isArray(c.keywords) && c.keywords.every(k => typeof k === 'string')); }
-const storedHistory = readStorage(KEYS.history, []);
-let readings = (Array.isArray(storedHistory) ? storedHistory : []).filter(validReading).slice(0,40).map(reading => ({
-  ...reading,
-  followups: Array.isArray(reading.followups) ? reading.followups.filter(validReading) : []
-}));
+function loadReadings() {
+  const history = readStorage(KEYS.history, []);
+  return (Array.isArray(history) ? history : []).filter(validReading).slice(0,40).map(reading => ({
+    ...reading,
+    followups: Array.isArray(reading.followups) ? reading.followups.filter(validReading) : []
+  }));
+}
+
+let readings = loadReadings();
 let persistedIds = new Set(readings.map(r=>r.id));
+
+function syncReadings(saved) {
+  readings = saved;
+  persistedIds = new Set(saved.map(r=>r.id));
+  updateCount();
+}
+
+async function changeReadings(change) {
+  const write = () => {
+    const latest = loadReadings();
+    if(!storageAvailable) return false;
+    const next = change(latest).slice(0,40);
+    if(!writeStorage(KEYS.history,next)) return false;
+    syncReadings(next);
+    return true;
+  };
+  // Serialize read/modify/write across tabs when Web Locks is available.
+  const locks = navigator.locks;
+  return locks ? locks.request(KEYS.history,write) : write();
+}
+
 const state = { view:'home', followup:false, followupOpen:false, followupQuestion:'', question:'', topic:'general', spreadId:null, shuffleMode:'overhand', deck:[], selected:[], busy:false, shuffled:false, shuffleCount:0, activeCard:null, revealed:0, reading:null, saved:false, hideQuestion:false, libraryFilter:'all', librarySearch:'', birthInput:'', birthResult:null };
 let toastTimer;
 const arrow = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>';
@@ -95,12 +120,12 @@ function renderWheel() {
       // Each card has a fixed wedge, so a raised card cannot steal its neighbor's input.
       const left = angle - step / 2;
       const right = angle + step / 2;
-      const hit = [wheelPoint(left, 28), wheelPoint(left, 72), wheelPoint(right, 72), wheelPoint(right, 28)]
+      const hit = [wheelPoint(left, 28), wheelPoint(left, 48), wheelPoint(right, 48), wheelPoint(right, 28)]
         .map(([px, py]) => `${px}% ${py}%`).join(',');
       return `<button type="button" class="wheel-hit" data-deck-index="${index}" style="--hit:polygon(${hit})"
         aria-label="뒷면 카드 ${index+1}" aria-pressed="false"></button>
         <div class="wheel-face" data-wheel-back="${index}" aria-hidden="true" style="left:${x}%;top:${y}%;--angle:${angle}deg;--fan-delay:${index*3}ms">
-          <div class="card-back wheel-back">${backMark}</div>
+          <button type="button" tabindex="-1" class="card-back wheel-back" data-confirm-card="${index}">${backMark}</button>
         </div>`;
     }).join('')}
     <div class="wheel-center"><strong id="draw-count">${state.selected.length} / ${spread().count}장 선택</strong><span id="wheel-next">${e(nextCardText())}</span></div>
@@ -282,26 +307,86 @@ function startFollowup() {
   setView('shuffle');
 }
 
-function showResult() { if(state.busy||state.revealed!==spread().count)return;try{const round=makeReading({question:state.question,topic:state.topic,spreadId:state.spreadId,selected:state.selected.map(({id,reversed})=>({id,reversed}))});round.deckMode=state.sessionDeck||settings.deck;
-round.allowReversed=state.sessionReversed??settings.reversed;
-const appended=state.followup;
-state.reading=appended
-  ? {...state.reading, followups:[...state.reading.followups,round]}
-  : {...round,followups:[]};
-clearFollowup();
-readings=[state.reading,...readings.filter(r=>r.id!==state.reading.id)].slice(0,40);state.saved=writeStorage(KEYS.history,readings);if(state.saved)persistedIds=new Set(readings.map(r=>r.id));
-else persistedIds.delete(state.reading.id);
-setView('result',{scroll:!appended});
-if(appended) {
-  const latest=$('.reading-round:last-child summary');
-  latest?.focus({preventScroll:true});
-  latest?.scrollIntoView({block:'start',behavior:'instant'});
-}if(!state.saved)toast('기록을 저장할 공간이 없어요. 내용을 복사해 보관해 주세요.');}catch(error){toast(error.message);} }
+async function showResult() {
+  if(state.busy || state.view!=='reveal' || state.revealed!==spread().count) return;
+  state.busy = true;
+  try {
+    const round = makeReading({question:state.question,topic:state.topic,spreadId:state.spreadId,selected:state.selected.map(({id,reversed})=>({id,reversed}))});
+    round.deckMode = state.sessionDeck || settings.deck;
+    round.allowReversed = state.sessionReversed ?? settings.reversed;
+    const parent = state.followup ? state.reading : null;
+    const parentWasSaved = parent && state.saved;
+    let result = parent ? {...parent, followups:[...parent.followups,round]} : {...round,followups:[]};
+    try {
+      state.saved = await changeReadings(latest => {
+        const existing = parent && latest.find(r=>r.id===parent.id);
+        if(existing) result = {...existing, followups:[...existing.followups,round]};
+        else if(parentWasSaved) throw new Error('다른 탭에서 이 기록이 사라졌어요. 이번 풀이를 복사해 보관할 수 있어요.');
+        return [result,...latest.filter(r=>r.id!==result.id)];
+      });
+      if(!state.saved) toast('기록을 저장하지 못했어요. 내용을 복사해 보관해 주세요.');
+    } catch(error) {
+      state.saved = false;
+      toast(error.message);
+    }
+    state.reading = result;
+    clearFollowup();
+    setView('result',{scroll:!parent});
+    if(parent){
+      const latest = $('.reading-round:last-child summary');
+      latest?.focus({preventScroll:true});
+      latest?.scrollIntoView({block:'start',behavior:'instant'});
+    }
+  } catch(error) {
+    toast(error.message);
+  } finally {
+    state.busy = false;
+  }
+}
 function confirmReset() { openModal('다시 섞을까요?',`<p>지금 고른 카드를 내려놓고 같은 질문으로 다시 섞습니다.</p><div class="stage-actions"><button class="btn ghost" data-action="close-modal">계속 고르기</button><button class="btn primary" data-action="confirm-repick">다시 섞기</button></div>`); }
 function confirmLeave(view) { openModal('지금 리딩을 나갈까요?',`<p>진행 중인 카드 선택은 저장되지 않습니다. 완성한 결과는 나의 기록에 남아요.</p><div class="stage-actions"><button class="btn ghost" data-action="close-modal">계속하기</button><button class="btn primary" data-leave-to="${e(view)}">이동하기</button></div>`); }
 
-document.addEventListener('submit',event=>{if(event.target.id==='question-form'){event.preventDefault();startReading();}if(event.target.id==='followup-form'){event.preventDefault();startFollowup();}if(event.target.id==='birth-form'){event.preventDefault();const input=$('#birth-date');state.birthInput=input.value;try{state.birthResult=birthCards(input.value);$('#birth-error').textContent='';input.removeAttribute('aria-invalid');$('#birth-output').innerHTML=birthResultHtml();$('#birth-result').scrollIntoView({behavior:duration(1)?'smooth':'instant',block:'start'});announce('탄생 카드 계산을 마쳤어요.');}catch(error){$('#birth-error').textContent=error.message;input.setAttribute('aria-invalid','true');input.focus();}}});
-document.addEventListener('input',event=>{if(event.target.id==='question'){state.question=event.target.value;$('#question-counter').textContent=`${[...state.question].length} / 240`;$('#question-error').textContent='';event.target.removeAttribute('aria-invalid');}if(event.target.id==='followup-question'){
+function deleteReadings(button,change,message) {
+  button.disabled = true;
+  return changeReadings(change).then(saved => {
+    if(!saved) throw new Error();
+    dialog.close();
+    render();
+    toast(message);
+  }).catch(() => {
+    button.disabled = false;
+    toast('기록을 삭제하지 못했어요. 브라우저 저장 설정을 확인해 주세요.');
+  });
+}
+
+function clearBirthResult(input) {
+  state.birthInput = input.value;
+  state.birthResult = null;
+  $('#birth-output').replaceChildren();
+  $('#birth-error').textContent = '';
+  input.removeAttribute('aria-invalid');
+}
+
+document.addEventListener('submit',event => {
+  if(event.target.id==='question-form'){event.preventDefault();startReading();}
+  if(event.target.id==='followup-form'){event.preventDefault();startFollowup();}
+  if(event.target.id!=='birth-form') return;
+  event.preventDefault();
+  const input = $('#birth-date');
+  clearBirthResult(input);
+  try {
+    state.birthResult = birthCards(input.value);
+    $('#birth-output').innerHTML = birthResultHtml();
+    $('#birth-result').scrollIntoView({behavior:duration(1)?'smooth':'instant',block:'start'});
+    announce('탄생 카드 계산을 마쳤어요.');
+  } catch(error) {
+    $('#birth-error').textContent = error.message;
+    input.setAttribute('aria-invalid','true');
+    input.focus();
+  }
+});
+
+document.addEventListener('input',event=>{if(event.target.id==='birth-date')clearBirthResult(event.target);if(event.target.id==='question'){state.question=event.target.value;$('#question-counter').textContent=`${[...state.question].length} / 240`;$('#question-error').textContent='';event.target.removeAttribute('aria-invalid');}if(event.target.id==='followup-question'){
   state.followupQuestion=event.target.value;
   $('#followup-error').textContent='';
   event.target.removeAttribute('aria-invalid');
@@ -325,6 +410,12 @@ document.addEventListener('click',async event=>{const nav=event.target.closest('
 if(b.dataset.spread){updateSpreadChoice(b.dataset.spread);return;}
   if(b.dataset.topic){state.topic=b.dataset.topic;$$('[data-topic]').forEach(el=>{const on=el.dataset.topic===state.topic;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on);});return;}
   if(b.dataset.shuffleMode){if(state.busy)return;state.shuffleMode=b.dataset.shuffleMode;$$('[data-shuffle-mode]').forEach(el=>{const on=el.dataset.shuffleMode===state.shuffleMode;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on);});$('.shuffle-stage').dataset.mode=state.shuffleMode;return;}
+  if(b.hasAttribute('data-confirm-card')){
+    const index = Number(b.dataset.confirmCard);
+    const hit = $(`[data-deck-index="${index}"]`);
+    if(hit) await pickCard(index,hit);
+    return;
+  }
   if(b.hasAttribute('data-deck-index')){
     if(state.busy || state.view!=='pick') return;
     const index = Number(b.dataset.deckIndex);
@@ -337,7 +428,10 @@ if(b.dataset.spread){updateSpreadChoice(b.dataset.spread);return;}
   if(b.dataset.filter){state.libraryFilter=b.dataset.filter;$$('[data-filter]').forEach(el=>{const on=el.dataset.filter===state.libraryFilter;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on);});updateLibrary();return;}
   if(b.dataset.openReading){const r=readings.find(r=>r.id===b.dataset.openReading);if(r){clearFollowup();state.reading=r;state.saved=persistedIds.has(r.id);setView('result');}return;}
   if(b.dataset.deleteReading){openModal('이 기록을 지울까요?',`<p>이 기기에 저장된 해당 리딩을 삭제합니다.</p><div class="stage-actions"><button class="btn ghost" data-action="close-modal">남겨두기</button><button class="btn primary" data-confirm-delete="${e(b.dataset.deleteReading)}">기록 삭제</button></div>`);return;}
-  if(b.dataset.confirmDelete){const next=readings.filter(r=>r.id!==b.dataset.confirmDelete);if(!writeStorage(KEYS.history,next)){toast('기록을 삭제하지 못했어요. 브라우저 저장 설정을 확인해 주세요.');return;}readings=next;persistedIds=new Set(readings.map(r=>r.id));dialog.close();render();toast('기록을 지웠어요.');return;}
+  if(b.dataset.confirmDelete){
+    await deleteReadings(b,latest=>latest.filter(r=>r.id!==b.dataset.confirmDelete),'기록을 지웠어요.');
+    return;
+  }
   const action=b.dataset.action;if(!action)return;
   try{switch(action){
     case 'close-modal':dialog.close();break;
@@ -363,7 +457,7 @@ if(b.dataset.spread){updateSpreadChoice(b.dataset.spread);return;}
     case 'start-reveal':if(!state.busy&&state.selected.length===spread().count){state.revealed=0;setView('reveal');}break;
     case 'reveal-next':await revealOne();break;
     case 'reveal-all':await revealAll();break;
-    case 'show-result':showResult();break;
+    case 'show-result':await showResult();break;
     case 'open-followup':
       state.followupOpen=true;
       $('.followup-panel').innerHTML=followupForm(state.reading.followups.length+2);
@@ -380,7 +474,7 @@ if(b.dataset.spread){updateSpreadChoice(b.dataset.spread);return;}
     case 'share-reading':await shareReading();break;
     case 'new-reading':newReading();break;
     case 'clear-history':openModal('모든 기록을 지울까요?',`<p>이 브라우저에 보관한 ${readings.length}개의 리딩을 모두 삭제합니다. 보관할 내용이 있다면 먼저 기록을 내보내 주세요.</p><div class="stage-actions"><button class="btn ghost" data-action="close-modal">남겨두기</button><button class="btn primary" data-action="confirm-clear">모든 기록 삭제</button></div>`);break;
-    case 'confirm-clear':if(writeStorage(KEYS.history,[])){readings=[];persistedIds=new Set();dialog.close();render();toast('모든 기록을 지웠어요.');}else toast('기록을 삭제하지 못했어요. 브라우저 저장 설정을 확인해 주세요.');break;
+    case 'confirm-clear':await deleteReadings(b,()=>[],'모든 기록을 지웠어요.');break;
     case 'export-history':download(`월솜-타로-기록-${todayString()}.json`,JSON.stringify({app:'월솜 타로',version:1,exportedAt:new Date().toISOString(),readings},null,2));toast('기록 파일을 내려받았어요.');break;
     case 'select-copy':$('#manual-copy').focus();$('#manual-copy').select();break;
     case 'copy-birth':if(state.birthResult){const r=state.birthResult;await copyText(`월솜 타로 · 탄생 카드\n${r.date} · ${r.method}\n\n계산 과정\n${r.steps.join('\n')}\n\n${r.cards.map(c=>`${c.number}. ${c.name} (${c.english})\n${c.keywords.join(' · ')}\n${c.birth}\n살펴볼 습관: ${c.advice}`).join('\n\n')}\n\n성격을 결정하는 분석이 아닌 카드 상징을 통한 자기 탐색입니다.`);}break;
@@ -388,6 +482,11 @@ if(b.dataset.spread){updateSpreadChoice(b.dataset.spread);return;}
   }}catch(error){toast(error?.message||'잠시 후 다시 시도해 주세요.');}
 });
 dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
+window.addEventListener('storage',event => {
+  if(event.storageArea!==localStorage || (event.key!==KEYS.history && event.key!==null)) return;
+  syncReadings(loadReadings());
+  if(state.view==='history') render();
+});
 window.addEventListener('hashchange',()=>{const view={reading:'home',birth:'birth',library:'library',history:'history'}[location.hash.slice(1)];if(view&&!state.busy){clearFollowup();setView(view);}});
 window.addEventListener('beforeunload',event=>{if(['pick','reveal'].includes(state.view)&&state.selected.length){event.preventDefault();event.returnValue='';}});
 applySettings();updateCount();const initialView={birth:'birth',library:'library',history:'history'}[location.hash.slice(1)]||'home';setView(initialView,{scroll:false});
