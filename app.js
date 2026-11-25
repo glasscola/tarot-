@@ -22,7 +22,7 @@ let readings = (Array.isArray(storedHistory) ? storedHistory : []).filter(validR
   followups: Array.isArray(reading.followups) ? reading.followups.filter(validReading) : []
 }));
 let persistedIds = new Set(readings.map(r=>r.id));
-const state = { view:'home', followup:false, followupOpen:false, followupQuestion:'', sector:null, question:'', topic:'general', spreadId:null, shuffleMode:'overhand', deck:[], selected:[], busy:false, shuffled:false, shuffleCount:0, activeCard:null, revealed:0, reading:null, saved:false, hideQuestion:false, libraryFilter:'all', librarySearch:'', birthInput:'', birthResult:null };
+const state = { view:'home', followup:false, followupOpen:false, followupQuestion:'', question:'', topic:'general', spreadId:null, shuffleMode:'overhand', deck:[], selected:[], busy:false, shuffled:false, shuffleCount:0, activeCard:null, revealed:0, reading:null, saved:false, hideQuestion:false, libraryFilter:'all', librarySearch:'', birthInput:'', birthResult:null };
 let toastTimer;
 const arrow = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>';
 const backArrow = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M19 12H5m5-5-5 5 5 5"/></svg>';
@@ -53,13 +53,15 @@ function deckSummary(s) {
 }
 
 function readingSettings(s) {
-  const options = (key, title, choices, value) => `<fieldset><legend>${title}</legend><div class="reading-options">${choices.map(([id, label]) =>
-    `<label><input type="radio" name="reading-${key}" data-reading-setting="${key}" value="${id}" ${id === value ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div></fieldset>`;
+  const options = (key, title, choices, value, help = '') => `<fieldset><legend>${title}</legend><div class="reading-options">${choices.map(([id, label]) =>
+    `<label><input type="radio" name="reading-${key}" data-reading-setting="${key}" value="${id}" ${id === value ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div>${help ? `<p class="reading-setting-help">${help}</p>` : ''}</fieldset>`;
   return `<section class="reading-settings" aria-label="리딩 설정">
     <div class="reading-settings-head"><strong>리딩 설정</strong><span id="deck-summary" aria-live="polite">${deckSummary(s)}</span></div>
     <div class="reading-settings-grid">
-      ${options('deck','사용할 카드',[['full','전체 78장'],['major','메이저 22장']],settings.deck)}
-      ${options('direction','카드 방향',[['upright','정방향만'],['reversed','역방향 포함']],settings.reversed ? 'reversed' : 'upright')}
+      ${options('deck','사용할 카드',[['full','전체 78장'],['major','메이저 22장']],settings.deck,'전체 78장은 큰 흐름을 보는 메이저 22장과 일상의 상황을 보는 마이너 56장을 모두 써요. 메이저 22장은 질문의 큰 주제에 집중하고 싶을 때 골라보세요.')}
+      ${options('direction','카드 방향',[['upright','정방향만'],['reversed','역방향 포함']],settings.reversed ? 'reversed' : 'upright','정방향만 고르면 카드의 기본 의미로 읽어요. 역방향을 포함하면 뒤집혀 나온 카드를 지연, 부족함, 지나침 등 다른 관점에서 읽을 수 있어요.')}
+    </div>
+    <div class="reading-motion">
       ${options('motion','카드 움직임',[['normal','기본'],['quick','빠르게'],['off','끄기']],settings.motion)}
     </div>
   </section>`;
@@ -74,15 +76,9 @@ function steps(active) { return `<div class="progress-steps" aria-label="진행 
 function questionStrip() { const deckMode=state.deck.length?(state.sessionDeck||settings.deck):settings.deck;const reversal=state.deck.length?(state.sessionReversed??settings.reversed):settings.reversed;return `<div class="question-strip"><div><span>마음에 품은 질문</span>${e(state.question)}</div><div>${e(spread().name)}<span>${deckMode==='major'?'메이저 22장':'전체 78장'} · ${reversal?'정·역방향':'정방향'}</span></div></div>`; }
 function renderShuffle() { return `<div class="shell page page-narrow">${steps(1)}${questionStrip()}<div class="stage-heading"><h2>마음을 모아, 카드를 섞어요.</h2><p>편안한 방식을 고르세요. 원하는 만큼 다시 섞어도 괜찮아요.</p></div><div class="shuffle-options" aria-label="셔플 방식">${[['overhand','작은 묶음으로','오버핸드'],['riffle','두 묶음을 교차해','리플'],['wash','넓게 펼쳐','워시']].map(([id,label,name])=>`<button class="shuffle-option ${state.shuffleMode===id?'active':''}" data-shuffle-mode="${id}" aria-pressed="${state.shuffleMode===id}">${label} · ${name}</button>`).join('')}</div><div class="shuffle-stage" data-mode="${state.shuffleMode}" aria-hidden="true">${Array.from({length:12},(_,i)=>`<div class="card-back pack-card" style="--i:${i};--side:${i%2?1:-1};--x:${Math.round(Math.sin(i*2.2)*160)};--y:${Math.round(Math.cos(i*2.5)*45)};--r:${Math.round(Math.sin(i*1.3)*55)}">${backMark}</div>`).join('')}</div><div class="stage-actions"><button class="btn ${state.shuffled?'ghost':'primary'}" data-action="shuffle">${state.shuffled?'다시 섞기':'셔플 시작'} <span aria-hidden="true">⤨</span></button><button class="btn ghost" data-action="cut" ${state.shuffled?'':'disabled'}>카드 나누기</button><button class="btn ${state.shuffled?'primary':''}" data-action="start-pick" ${state.shuffled?'':'disabled'}>카드 고르기 ${arrow}</button></div><p class="stage-hint" id="shuffle-hint">${state.shuffled?`${state.shuffleCount}번 섞었어요. 준비가 되면 카드를 골라보세요.`:'셔플을 시작하면 카드 순서가 새롭게 섞여요.'}</p><div class="stage-hint"><button class="text-button" data-action="back-question">${backArrow} 질문과 배열 바꾸기</button></div></div>`; }
 function slotHtml(i) { const s=spread();const p=s.positions[i];const filled=i<state.selected.length;return `<div class="spread-slot" style="${cellStyle(s,i)}"><div class="slot-card ${filled?'filled':''}" id="slot-${i}">${filled?backCard():String(i+1).padStart(2,'0')}</div><div class="slot-label"><b>${i+1}번째 카드</b>${e(p.name)}</div></div>`; }
-const SECTORS = 8;
-
-function sectorFor(index) {
-  return Math.floor(index * SECTORS / state.deck.length);
-}
-
-function wheelPosition(angle, radius) {
+function wheelPoint(angle, radius) {
   const radians = angle * Math.PI / 180;
-  return `left:${50 + radius * Math.sin(radians)}%;top:${50 - radius * Math.cos(radians)}%;--angle:${angle}deg`;
+  return [50 + radius * Math.sin(radians), 50 - radius * Math.cos(radians)];
 }
 
 function nextCardText() {
@@ -90,28 +86,28 @@ function nextCardText() {
 }
 
 function renderWheel() {
-  const done = state.selected.length === spread().count;
-  const taken = new Set(state.selected.map(card => card.deckIndex));
-  const indexes = state.deck.map((_, i) => i);
-  const inSector = indexes.filter(i => sectorFor(i) === state.sector);
-  return `<div class="deck-wheel" aria-label="원형 카드 덱">
-    <div class="wheel-backs" aria-hidden="true">${indexes.map(i => taken.has(i) ? '' :
-      `<div class="card-back wheel-back" data-wheel-back="${i}" style="${wheelPosition((i+.5)*360/indexes.length,39)};--fan-delay:${i*3}ms">${backMark}</div>`).join('')}</div>
+  const count = state.deck.length;
+  const step = 360 / count;
+  return `<div class="deck-wheel" role="group" aria-label="원형 카드 덱" aria-describedby="pick-instruction">
+    ${state.deck.map((_, index) => {
+      const angle = index * step;
+      const [x, y] = wheelPoint(angle, 38);
+      // Each card has a fixed wedge, so a raised card cannot steal its neighbor's input.
+      const left = angle - step / 2;
+      const right = angle + step / 2;
+      const hit = [wheelPoint(left, 28), wheelPoint(left, 72), wheelPoint(right, 72), wheelPoint(right, 28)]
+        .map(([px, py]) => `${px}% ${py}%`).join(',');
+      return `<button type="button" class="wheel-hit" data-deck-index="${index}" style="--hit:polygon(${hit})"
+        aria-label="뒷면 카드 ${index+1}" aria-pressed="false"></button>
+        <div class="wheel-face" data-wheel-back="${index}" aria-hidden="true" style="left:${x}%;top:${y}%;--angle:${angle}deg;--fan-delay:${index*3}ms">
+          <div class="card-back wheel-back">${backMark}</div>
+        </div>`;
+    }).join('')}
     <div class="wheel-center"><strong id="draw-count">${state.selected.length} / ${spread().count}장 선택</strong><span id="wheel-next">${e(nextCardText())}</span></div>
-    <div role="group" aria-label="카드 구역">${Array.from({length:SECTORS},(_, i) => {
-      const cards = indexes.filter(index => sectorFor(index) === i);
-      return `<button class="wheel-sector" style="${wheelPosition((i+.5)*360/SECTORS,29)}" data-sector="${i}" aria-pressed="${state.sector === i}" aria-label="${i+1}구역, ${cards[0]+1}번부터 ${cards.at(-1)+1}번 카드" ${done || cards.every(index => taken.has(index)) ? 'disabled' : ''}>${i+1}</button>`;
-    }).join('')}</div>
-  </div>
-  <div id="wheel-fan" class="wheel-fan" ${state.sector === null ? 'hidden' : ''}>
-    <p><strong>${(state.sector ?? 0)+1}구역</strong> · 터치는 한 번 눌러 들고 다시 눌러 선택해요.</p>
-    <div class="deck-grid wheel-fan-grid" role="group" aria-label="이 구역의 뒷면 카드">${inSector.map(i =>
-      `<button class="card-back deck-card ${taken.has(i) ? 'picked' : ''}" data-deck-index="${i}" aria-label="뒷면 카드 ${i+1} 선택" ${taken.has(i) || done ? 'disabled' : ''}>${backMark}<span class="deck-number" aria-hidden="true">${i+1}</span></button>`).join('')}</div>
-  </div>
-  <div class="deck-confirm-row wheel-confirm"><button class="btn small" data-action="confirm-card" disabled>이 카드 선택</button></div>`;
+  </div>`;
 }
 
-function renderPick() { const s=spread();return `<div class="shell page pick-page">${steps(2)}${questionStrip()}<div class="stage-heading"><h2>원 안에서 마음이 가는 카드를 골라요.</h2><p id="pick-instruction">원에서 구역을 열고 카드를 골라주세요.</p></div><div class="picking-workspace"><section class="placement-panel" aria-label="${e(s.layoutName)} 카드 배치"><div class="placement-heading"><span>${e(s.layoutName)}</span><button class="text-button" data-action="spread-info">자리 설명 ⓘ</button></div><div class="spread-slots has-layout" data-layout="${s.layout}" style="${layoutStyle(s)}" aria-label="선택한 카드 자리">${s.positions.map((_,i)=>slotHtml(i)).join('')}</div><p class="next-position" id="next-position">${state.selected.length<s.count?`다음은 ${state.selected.length+1}번 · ${e(s.positions[state.selected.length].name)}<span>${e(s.positions[state.selected.length].meaning)}</span>`:'모든 자리를 채웠어요. 이제 카드를 펼쳐보세요.'}</p></section><section class="all-cards-panel" aria-label="${state.deck.length}장 전체 카드"><div id="card-wheel">${renderWheel()}</div></section></div><div class="stage-actions"><button class="btn ghost" data-action="repick">처음부터 다시 섞기</button><button class="btn primary" data-action="start-reveal" ${state.selected.length===s.count?'':'disabled'}>선택한 카드 펼치기 ${arrow}</button></div><p class="stage-hint">1번부터 차례로 채워요. ${e(s.layoutName)}의 자리와 순서대로 해석합니다.</p></div>`; }
+function renderPick() { const s=spread();return `<div class="shell page pick-page">${steps(2)}${questionStrip()}<div class="stage-heading"><h2>원 안에서 마음이 가는 카드를 골라요.</h2><p id="pick-instruction">카드를 한 번 누르면 살짝 나와요. 같은 카드를 다시 눌러 선택하세요.</p></div><div class="picking-workspace"><section class="placement-panel" aria-label="${e(s.layoutName)} 카드 배치"><div class="placement-heading"><span>${e(s.layoutName)}</span><button class="text-button" data-action="spread-info">자리 설명 ⓘ</button></div><div class="spread-slots has-layout" data-layout="${s.layout}" style="${layoutStyle(s)}" aria-label="선택한 카드 자리">${s.positions.map((_,i)=>slotHtml(i)).join('')}</div><p class="next-position" id="next-position">${state.selected.length<s.count?`다음은 ${state.selected.length+1}번 · ${e(s.positions[state.selected.length].name)}<span>${e(s.positions[state.selected.length].meaning)}</span>`:'모든 자리를 채웠어요. 이제 카드를 펼쳐보세요.'}</p></section><section class="all-cards-panel" aria-label="${state.deck.length}장 전체 카드"><div id="card-wheel">${renderWheel()}</div></section></div><div class="stage-actions"><button class="btn ghost" data-action="repick">처음부터 다시 섞기</button><button class="btn primary" data-action="start-reveal" ${state.selected.length===s.count?'':'disabled'}>선택한 카드 펼치기 ${arrow}</button></div><p class="stage-hint">1번부터 차례로 채워요. ${e(s.layoutName)}의 자리와 순서대로 해석합니다.</p></div>`; }
 function renderReveal() { const s=spread();return `<div class="shell page">${steps(3)}${questionStrip()}<div class="stage-heading"><h2>배치 속에서 카드를 만나보세요.</h2><p>${e(s.layoutName)} · ${e(s.layoutDescription)}</p></div><div class="reveal-grid has-layout" style="${layoutStyle(s)}" data-layout="${s.layout}" data-count="${s.count}">${state.selected.map((picked,i)=>{const card=CARD_MAP.get(picked.id);return `<div class="reveal-item" style="${cellStyle(s,i)}"><div class="slot-label"><b>${i+1}번째 카드</b>${e(s.positions[i].name)}</div><button class="reveal-card ${i<state.revealed?'revealed':''}" data-reveal-index="${i}" aria-label="${i<state.revealed?`${e(card.name)}, ${picked.reversed?'역방향':'정방향'}`:`${i+1}번째 카드 공개`}" ${i!==state.revealed?'disabled':''}><div class="flip-inner"><div class="flip-back card-back">${backMark}</div><div class="flip-front" aria-hidden="true"><img src="${image(card.id)}" alt="" width="500" height="870" class="${picked.reversed?'reversed':''}"></div></div></button><div class="reveal-title" id="reveal-title-${i}">${i<state.revealed?`${e(card.name)}<span>${picked.reversed?'역방향':'정방향'}</span>`:'<span class="card-hidden-name">✧</span>'}</div></div>`;}).join('')}</div><div class="stage-actions"><button class="btn ${state.revealed<s.count?'primary':'ghost'}" data-action="reveal-next" ${state.revealed===s.count?'disabled':''}>다음 카드 공개 ${arrow}</button><button class="btn ghost" data-action="reveal-all" ${state.revealed===s.count?'disabled':''}>차례로 모두 공개</button><button class="btn ${state.revealed===s.count?'primary':''}" data-action="show-result" ${state.revealed===s.count?'':'disabled'}>나의 리딩 읽기 ${arrow}</button></div><p class="stage-hint" id="reveal-hint">${state.revealed===s.count?'모든 카드가 공개됐어요. 이제 자리별 이야기를 읽어보세요.':`${state.revealed} / ${s.count}장 공개`}</p></div>`; }
 function readingBody(r) {
   const rs = SPREADS.find(s => s.id === r.spreadId);
@@ -197,22 +193,73 @@ function clearFollowup() {
 function newReading() { clearFollowup();state.spreadId=null;state.question='';state.deck=[];state.selected=[];state.reading=null;state.shuffled=false;state.shuffleCount=0;state.revealed=0;setView('home');$('#question')?.focus({preventScroll:true}); }
 function startReading() { clearFollowup();try { if(!state.spreadId)throw new Error('위에서 배열을 먼저 골라주세요.');state.question=validateQuestion($('#question')?.value??state.question);state.selected=[];state.revealed=0;state.shuffled=false;state.shuffleCount=0;state.deck=[];setView('shuffle'); }catch(error){$('#question-error').textContent=error.message;$('#question').setAttribute('aria-invalid','true');$('#question').focus();} }
 async function runShuffle(cut=false) { if(state.busy||state.view!=='shuffle')return;state.busy=true;const stage=$('.shuffle-stage');const mode=state.shuffleMode;$$('.shuffle-options button,.stage-actions button',main).forEach(b=>b.disabled=true);try{if(cut){if(!state.deck.length)return;const b=new Uint32Array(1);crypto.getRandomValues(b);const split=1+(b[0]%(state.deck.length-1));state.deck=state.deck.slice(split).concat(state.deck.slice(0,split));stage.classList.add('cutting');$('#shuffle-hint').textContent='카드 묶음을 나누어 순서를 바꾸고 있어요.';}else{state.sessionDeck=settings.deck;state.sessionReversed=settings.reversed;state.deck=shuffleDeck(settings.deck==='major'?CARDS.filter(c=>c.arcana==='major'):CARDS,settings.reversed);stage.dataset.mode=mode;stage.classList.add('shuffling');$('#shuffle-hint').textContent='질문을 떠올리며 잠깐 숨을 고르세요.';}await delay(duration(cut?1100:mode==='wash'?1800:mode==='riffle'?1600:1500));if(!cut){state.shuffled=true;state.shuffleCount++;}announce(cut?'카드를 나눴어요.':`${state.shuffleCount}번 섞었어요. 카드 고르기를 누르세요.`);}catch(error){toast(error.message);}finally{state.busy=false;if(state.view==='shuffle'){main.innerHTML=renderShuffle();renderNav();}} }
-function armCard(index,button) { $$('.deck-card.lifted').forEach(b=>b.classList.remove('lifted'));state.activeCard=index;button.classList.add('lifted');const confirm=$('[data-action="confirm-card"]');if(confirm)confirm.disabled=false;announce(`${index+1}번째 뒷면 카드를 살펴보고 있어요. 다시 누르거나 이 카드 선택을 누르세요.`); }
-async function pickCard(index,button,{touch=false}={}) { if(state.busy||state.view!=='pick'||state.selected.length>=spread().count||state.selected.some(c=>c.deckIndex===index))return;const picked=state.deck[index];if(!picked)return;state.busy=true;state.activeCard=null;const target=$(`#slot-${state.selected.length}`);const start=button.getBoundingClientRect();const end=target.getBoundingClientRect();button.classList.remove('lifted');state.selected.push({...picked,deckIndex:index});button.disabled=true;button.classList.add('picked');$('[data-action="confirm-card"]').disabled=true;try{if(duration(650)>0&&button.animate){const ghost=document.createElement('div');ghost.className='card-back flying-card';ghost.innerHTML=backMark;ghost.style.cssText=`left:${start.left}px;top:${start.top}px;width:${start.width}px;height:${start.height}px;`;document.body.append(ghost);try{await ghost.animate([{transform:'translate(0,0) rotate(0deg)',opacity:1},{transform:`translate(${end.left-start.left}px,${end.top-start.top}px) scale(${end.width/start.width},${end.height/start.height}) rotate(0deg)`,opacity:1}],{duration:duration(650),easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'}).finished;}finally{ghost.remove();}}}catch{
-  // The choice is already committed even when an animation is interrupted.
-}finally{
-  target.innerHTML=backCard();target.classList.add('filled');
-  const sourceSector = state.sector;
-  const remainingHere = state.deck.some((_, i) => sectorFor(i) === sourceSector && !state.selected.some(card => card.deckIndex === i));
-  if(!remainingHere && state.selected.length < spread().count) {
-    state.sector = null;
-    $('#card-wheel').innerHTML = renderWheel();
-    $('.wheel-sector:not(:disabled)')?.focus();
-  } else {
-    $(`[data-wheel-back="${index}"]`)?.remove();
+function armCard(index, button) {
+  $('.wheel-hit[aria-pressed="true"]')?.setAttribute('aria-pressed','false');
+  state.activeCard = index;
+  button.setAttribute('aria-pressed','true');
+  announce(`${index+1}번째 뒷면 카드가 나왔어요. 같은 카드를 다시 누르면 선택돼요.`);
+}
+
+async function pickCard(index, button, {keyboard=false}={}) {
+  if(state.busy || state.view!=='pick' || state.activeCard!==index || button.disabled || state.selected.length>=spread().count) return;
+  const picked = state.deck[index];
+  const face = button.nextElementSibling;
+  const target = $(`#slot-${state.selected.length}`);
+  if(!picked || !face || !target) return;
+
+  const start = $('.wheel-back', face).getBoundingClientRect();
+  const end = target.getBoundingClientRect();
+  state.busy = true;
+  state.activeCard = null;
+  state.selected.push({...picked,deckIndex:index});
+  button.disabled = true;
+  button.setAttribute('aria-pressed','false');
+  face.hidden = true;
+  try {
+    if(duration(650) && button.animate && start.width && start.height){
+      const ghost = document.createElement('div');
+      ghost.className = 'card-back flying-card';
+      ghost.innerHTML = backMark;
+      ghost.style.cssText = `left:${start.left}px;top:${start.top}px;width:${start.width}px;height:${start.height}px`;
+      document.body.append(ghost);
+      try {
+        await ghost.animate([
+          {transform:'translate(0,0)'},
+          {transform:`translate(${end.left-start.left}px,${end.top-start.top}px) scale(${end.width/start.width},${end.height/start.height})`}
+        ],{duration:duration(650),easing:'cubic-bezier(.22,1,.36,1)'}).finished;
+      } finally {
+        ghost.remove();
+      }
+    }
+  } catch {
+    // The choice is committed even when the animation is interrupted.
+  } finally {
+    target.innerHTML = backCard();
+    target.classList.add('filled');
+    const done = state.selected.length===spread().count;
+    const nextPosition = spread().positions[state.selected.length];
+    $('#wheel-next').textContent = nextCardText();
+    $('#draw-count').textContent = `${state.selected.length} / ${spread().count}장 선택`;
+    $('#next-position').innerHTML = nextPosition
+      ? `다음은 ${state.selected.length+1}번 · ${e(nextPosition.name)}<span>${e(nextPosition.meaning)}</span>`
+      : '모든 자리를 채웠어요. 이제 카드를 펼쳐보세요.';
+    const revealButton = $('[data-action="start-reveal"]');
+    revealButton.disabled = !done;
+    if(done){
+      $$('.wheel-hit').forEach(card => card.disabled = true);
+      $('#pick-instruction').textContent = '모든 카드를 골랐어요. 이제 한 장씩 공개해 볼까요?';
+      announce('모든 카드를 골랐어요. 선택한 카드 펼치기를 누르세요.');
+      if(keyboard) revealButton.focus({preventScroll:true});
+    } else {
+      announce(`${state.selected.length}번째 카드를 골랐어요. 다음은 ${nextPosition.name} 자리예요.`);
+      if(keyboard){
+        const available = $$('.wheel-hit:not(:disabled)');
+        (available.find(card => Number(card.dataset.deckIndex)>index) || available[0])?.focus({preventScroll:true});
+      }
+    }
+    state.busy = false;
   }
-  $('#wheel-next').textContent=nextCardText();
-  $('#draw-count').textContent=`${state.selected.length} / ${spread().count}장 선택`;const nextPosition=$('#next-position');if(nextPosition){const next=spread().positions[state.selected.length];nextPosition.innerHTML=next?`다음은 ${state.selected.length+1}번 · ${e(next.name)}<span>${e(next.meaning)}</span>`:'모든 자리를 채웠어요. 이제 카드를 펼쳐보세요.';}const done=state.selected.length===spread().count;$('[data-action="start-reveal"]').disabled=!done;announce(done?'모든 카드를 골랐어요. 선택한 카드 펼치기를 누르세요.':`${state.selected.length}번째 ${spread().positions[state.selected.length-1].name} 자리의 카드를 골랐어요.`);if(done){$$('.deck-card,.wheel-sector').forEach(b=>b.disabled=true);$('#pick-instruction').textContent='모든 카드를 골랐어요. 이제 한 장씩 공개해 볼까요?';$('[data-action="start-reveal"]').focus({preventScroll:true});}else if(!touch){const next=$$('.deck-card:not(:disabled)').find(b=>Number(b.dataset.deckIndex)>index)||$('.deck-card:not(:disabled)');next?.focus({preventScroll:true});}state.busy=false;} }
+}
 async function revealOne({inSequence=false}={}) { if((state.busy&&!inSequence)||state.view!=='reveal'||state.revealed>=state.selected.length)return;const ownsBusy=!inSequence;if(ownsBusy)state.busy=true;const i=state.revealed;const picked=state.selected[i];const card=CARD_MAP.get(picked.id);const btn=$(`[data-reveal-index="${i}"]`);$$('.stage-actions button',main).forEach(b=>b.disabled=true);btn?.classList.add('revealed');btn?.setAttribute('aria-label',`${card.name}, ${picked.reversed?'역방향':'정방향'}`);if(btn)btn.disabled=true;state.revealed++;await delay(duration(850));if(state.view==='reveal'){$(`#reveal-title-${i}`).innerHTML=`${e(card.name)}<span>${picked.reversed?'역방향':'정방향'}</span>`;$('#reveal-hint').textContent=state.revealed===state.selected.length?'모든 카드가 공개됐어요. 이제 자리별 이야기를 읽어보세요.':`${state.revealed} / ${state.selected.length}장 공개`;announce(`${spread().positions[i].name}, ${card.name}, ${picked.reversed?'역방향':'정방향'}`);if(ownsBusy)updateRevealButtons();}if(ownsBusy)state.busy=false; }
 function updateRevealButtons() { const done=state.revealed>=state.selected.length;$('[data-action="reveal-next"]').disabled=done;$('[data-action="reveal-all"]').disabled=done;$('[data-action="show-result"]').disabled=!done;$('[data-action="show-result"]').classList.toggle('primary',done);$('[data-action="reveal-next"]').classList.toggle('primary',!done);const next=$(`[data-reveal-index="${state.revealed}"]`);if(next)next.disabled=false; }
 async function revealAll() { if(state.busy||state.view!=='reveal')return;state.busy=true;try{while(state.revealed<state.selected.length&&state.view==='reveal'){await revealOne({inSequence:true});if(state.revealed<state.selected.length)await delay(duration(280));}if(state.view==='reveal')updateRevealButtons();}finally{state.busy=false;} }
@@ -278,16 +325,13 @@ document.addEventListener('click',async event=>{const nav=event.target.closest('
 if(b.dataset.spread){updateSpreadChoice(b.dataset.spread);return;}
   if(b.dataset.topic){state.topic=b.dataset.topic;$$('[data-topic]').forEach(el=>{const on=el.dataset.topic===state.topic;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on);});return;}
   if(b.dataset.shuffleMode){if(state.busy)return;state.shuffleMode=b.dataset.shuffleMode;$$('[data-shuffle-mode]').forEach(el=>{const on=el.dataset.shuffleMode===state.shuffleMode;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on);});$('.shuffle-stage').dataset.mode=state.shuffleMode;return;}
-  if(b.hasAttribute('data-sector')){
-    if(state.busy || state.view !== 'pick') return;
-    state.sector = Number(b.dataset.sector);
-    state.activeCard = null;
-    $('#card-wheel').innerHTML = renderWheel();
-    if(event.detail === 0) $('.deck-card:not(:disabled)')?.focus();
-    else if (matchMedia('(any-pointer:coarse)').matches) $('#wheel-fan').scrollIntoView({block:'nearest', behavior:duration(1)?'smooth':'instant'});
+  if(b.hasAttribute('data-deck-index')){
+    if(state.busy || state.view!=='pick') return;
+    const index = Number(b.dataset.deckIndex);
+    if(state.activeCard!==index) armCard(index,b);
+    else await pickCard(index,b,{keyboard:event.detail===0});
     return;
   }
-  if(b.hasAttribute('data-deck-index')){const index=Number(b.dataset.deckIndex);if(state.busy)return;const touchInput=event.pointerType==='touch'||event.pointerType==='pen'||(!event.pointerType&&event.detail!==0&&matchMedia('(hover:none)').matches);if(touchInput&&state.activeCard!==index){armCard(index,b);return;}await pickCard(index,b,{touch:touchInput});return;}
   if(b.hasAttribute('data-reveal-index')){if(Number(b.dataset.revealIndex)===state.revealed)await revealOne();return;}
   if(b.dataset.card){showCard(b.dataset.card);return;}
   if(b.dataset.filter){state.libraryFilter=b.dataset.filter;$$('[data-filter]').forEach(el=>{const on=el.dataset.filter===state.libraryFilter;el.classList.toggle('active',on);el.setAttribute('aria-pressed',on);});updateLibrary();return;}
@@ -305,7 +349,7 @@ if(b.dataset.spread){updateSpreadChoice(b.dataset.spread);return;}
     case 'example':state.question=spread().question;$('#question').value=state.question;$('#question-counter').textContent=`${[...state.question].length} / 240`;$('#question-error').textContent='';$('#question').removeAttribute('aria-invalid');$('#question').focus();break;
     case 'shuffle':await runShuffle();break;
     case 'cut':await runShuffle(true);break;
-    case 'start-pick':if(state.shuffled&&!state.busy){state.selected=[];state.sector=null;setView('pick');}break;
+    case 'start-pick':if(state.shuffled&&!state.busy){state.selected=[];setView('pick');}break;
     case 'back-question':
       if(!state.busy){
         const followup=state.followup;
@@ -314,7 +358,6 @@ if(b.dataset.spread){updateSpreadChoice(b.dataset.spread);return;}
         if(followup) $('#followup-question')?.focus();
       }
       break;
-    case 'confirm-card':if(state.activeCard!==null)await pickCard(state.activeCard,$(`[data-deck-index="${state.activeCard}"]`),{touch:true});break;
     case 'repick':if(!state.busy)confirmReset();break;
     case 'confirm-repick':dialog.close();state.selected=[];state.revealed=0;state.shuffled=false;state.shuffleCount=0;setView('shuffle');break;
     case 'start-reveal':if(!state.busy&&state.selected.length===spread().count){state.revealed=0;setView('reveal');}break;
